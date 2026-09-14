@@ -1,0 +1,573 @@
+{
+  "name": "AI API Security Auditor - Commit 25",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "api-security-audit",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        16080,
+        5520
+      ],
+      "id": "bca242fb-24de-446a-bd2f-b11fcf5048cf",
+      "webhookId": "9850890d-beca-481d-b6c4-78f0d53afe29"
+    },
+    {
+      "parameters": {
+        "jsCode": "/* Commit 25: Robust Centralized Input Validation & SSRF Prevention */\nconst items = $input.all();\nconst results = [];\nconst DEFAULT_API = 'https://reqres.in/api/users';\n\nfor (const item of items) {\n  try {\n    let rawUrl = null;\n    const body = item.json.body || item.json;\n    \n    if (typeof body === 'object' && body !== null) {\n      rawUrl = body.url;\n    } else if (typeof body === 'string') {\n      try {\n        const parsed = JSON.parse(body);\n        rawUrl = parsed.url;\n      } catch (e) {\n        rawUrl = body;\n      }\n    }\n\n    if (!rawUrl || typeof rawUrl !== 'string' || rawUrl.trim() === '') {\n      rawUrl = DEFAULT_API;\n    }\n\n    let targetUrl = rawUrl.replace(/[\\x00-\\x1F\\x7F-\\x9F]/g, '').trim().replace(/^['\"]|['\"]$/g, '');\n\n    if (!targetUrl.startsWith('http://') && !targetUrl.startsWith('https://')) {\n      targetUrl = 'https://' + targetUrl;\n    }\n\n    let isValid = true;\n    let errorType = null;\n    let errorMessage = null;\n\n    const urlPattern = /^(https?):\\/\\/([^/:]+)(?::(\\d+))?(.*)$/i;\n    const match = targetUrl.match(urlPattern);\n\n    if (!match) {\n      isValid = false;\n      errorType = 'INVALID_URL';\n      errorMessage = 'Malformed URL syntax provided.';\n    } else {\n      const protocol = match[1].toLowerCase();\n      let hostname = match[2].toLowerCase();\n\n      if (hostname.startsWith('[') && hostname.endsWith(']')) {\n        hostname = hostname.slice(1, -1);\n      }\n\n      if (protocol !== 'http' && protocol !== 'https') {\n        isValid = false;\n        errorType = 'INVALID_PROTOCOL';\n        errorMessage = 'Unsupported protocol. Only HTTP and HTTPS are permitted.';\n      } \n      else if (\n        hostname === 'localhost' ||\n        hostname === '0.0.0.0' ||\n        hostname === '::1' ||\n        hostname === '0000:0000:0000:0000:0000:0000:0000:0001' ||\n        hostname.startsWith('127.') ||\n        hostname.startsWith('10.') ||\n        hostname.startsWith('192.168.') ||\n        /^172\\.(1[6-9]|2[0-9]|3[0-1])\\./.test(hostname) ||\n        hostname.startsWith('169.254.') ||\n        hostname.endsWith('.internal') ||\n        hostname.endsWith('.local') ||\n        hostname.endsWith('.lan') ||\n        hostname.endsWith('.home') ||\n        hostname.endsWith('.corp') ||\n        hostname.endsWith('.private')\n      ) {\n        isValid = false;\n        errorType = 'SSRF_RESTRICTED_TARGET';\n        errorMessage = 'Target points to a restricted internal, loopback, or metadata address.';\n      }\n    }\n\n    if (!isValid) {\n      results.push({\n        json: {\n          status: 'error',\n          error_code: errorType,\n          url: targetUrl,\n          message: errorMessage,\n          start_time: Date.now(),\n          timestamp: new Date().toISOString()\n        }\n      });\n    } else {\n      results.push({\n        json: {\n          status: 'ready_for_scan',\n          error_code: null,\n          url: targetUrl,\n          message: null,\n          start_time: Date.now(),\n          timestamp: new Date().toISOString()\n        }\n      });\n    }\n  } catch (err) {\n    results.push({\n      json: {\n        status: 'error',\n        error_code: 'VALIDATION_EXCEPTION',\n        url: 'unknown',\n        message: 'An unexpected exception occurred during input validation.',\n        start_time: Date.now(),\n        timestamp: new Date().toISOString()\n      }\n    });\n  }\n}\n\nreturn results;"
+      },
+      "name": "Validate Input",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        16304,
+        5520
+      ],
+      "id": "0e755805-146c-49d9-bb94-28bd6e4bfdd3"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "cond-status-check",
+              "leftValue": "={{ $json.status }}",
+              "rightValue": "ready_for_scan",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "name": "IF Valid Target",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        16528,
+        5520
+      ],
+      "id": "e6d00507-ee80-4c22-82a4-24ef3efa7147"
+    },
+    {
+      "parameters": {
+        "url": "={{ $json.url }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "User-Agent",
+              "value": "AI-API-Security-Auditor/2.5"
+            },
+            {
+              "name": "Accept",
+              "value": "application/json, text/plain, */*"
+            }
+          ]
+        },
+        "options": {
+          "redirect": {},
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": false,
+              "responseFormat": "autodetect"
+            }
+          },
+          "timeout": 8000
+        }
+      },
+      "name": "Safe GET Scan Target",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        16768,
+        5408
+      ],
+      "id": "d208bf00-6edb-41f2-a076-bd4079d93843",
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "/* Commit 25: Robust Response Normalization, Bounded Body Inspection & Size Limits */\nconst items = $input.all();\nconst results = [];\nconst MAX_BODY_BYTES = 500 * 1024;\n\nfor (const item of items) {\n  try {\n    const res = item.json;\n    const validateData = $('Validate Input').item?.json || {};\n    const targetUrl = validateData.url || 'unknown';\n    const startTime = validateData.start_time || Date.now();\n    const endTime = Date.now();\n    const responseTimeMs = Math.max(0, endTime - startTime);\n\n    if (res.error || (res.statusCode >= 500 && !res.body)) {\n      let errCode = 'NETWORK_ERROR';\n      let msg = res.error?.message || res.message || 'Failed to reach target endpoint.';\n\n      if (msg.includes('ENOTFOUND') || msg.includes('getaddrinfo')) {\n        errCode = 'DNS_LOOKUP_FAILED';\n        msg = 'Domain resolution failed (host not found).';\n      } else if (msg.includes('ETIMEDOUT') || msg.includes('timeout') || msg.includes('ESOCKETTIMEDOUT')) {\n        errCode = 'CONNECTION_TIMEOUT';\n        msg = 'Target server timed out after configured threshold.';\n      } else if (msg.includes('ECONNREFUSED')) {\n        errCode = 'CONNECTION_REFUSED';\n        msg = 'Connection refused by target host.';\n      }\n\n      results.push({\n        json: {\n          status: 'error',\n          error_code: errCode,\n          url: targetUrl,\n          message: msg,\n          start_time: startTime,\n          timestamp: new Date().toISOString()\n        }\n      });\n      continue;\n    }\n\n    const statusCode = res.statusCode || 200;\n    const rawHeaders = res.headers || {};\n    const normalizedHeaders = {};\n    \n    for (const [key, val] of Object.entries(rawHeaders)) {\n      const lowerKey = key.toLowerCase();\n      if (['authorization', 'cookie', 'set-cookie', 'x-api-key', 'token', 'bearer', 'sec-websocket-key'].includes(lowerKey)) {\n        normalizedHeaders[lowerKey] = '[REDACTED]';\n      } else {\n        normalizedHeaders[lowerKey] = val;\n      }\n    }\n\n    const contentTypeHeader = normalizedHeaders['content-type'] || '';\n    const isJson = contentTypeHeader.includes('application/json');\n    const isXml = contentTypeHeader.includes('application/xml') || contentTypeHeader.includes('text/xml');\n    const isHtml = contentTypeHeader.includes('text/html');\n\n    let bodySizeBytes = 0;\n    const rawBody = res.body;\n    let bodyString = '';\n\n    if (rawBody) {\n      if (typeof rawBody === 'string') {\n        bodyString = rawBody;\n      } else if (typeof rawBody === 'object') {\n        try {\n          bodyString = JSON.stringify(rawBody);\n        } catch (e) {\n          bodyString = '[UNSERIALIZABLE_BODY]';\n        }\n      }\n      bodySizeBytes = Buffer.byteLength(bodyString, 'utf8');\n    } else if (normalizedHeaders['content-length']) {\n      bodySizeBytes = parseInt(normalizedHeaders['content-length'], 10) || 0;\n    }\n\n    if (bodySizeBytes > MAX_BODY_BYTES) {\n      results.push({\n        json: {\n          status: 'error',\n          error_code: 'RESPONSE_SIZE_EXCEEDED',\n          url: targetUrl,\n          message: `Response size (${bodySizeBytes} bytes) exceeds safety maximum.`,\n          start_time: startTime,\n          timestamp: new Date().toISOString()\n        }\n      });\n      continue;\n    }\n\n    const sanitizedBodySnippet = bodyString.length > 50000 ? bodyString.substring(0, 50000) + '...[TRUNCATED]' : bodyString;\n\n    const normalizedScan = {\n      status: statusCode >= 400 ? 'http_error' : 'scan_completed',\n      target: {\n        url: targetUrl,\n        status_code: statusCode,\n        response_time_ms: responseTimeMs\n      },\n      metadata: {\n        content_type: contentTypeHeader || 'unknown',\n        content_length_bytes: bodySizeBytes,\n        is_json: isJson,\n        is_xml: isXml,\n        is_html: isHtml\n      },\n      headers: normalizedHeaders,\n      _internal_body_snippet: sanitizedBodySnippet,\n      start_time: startTime,\n      timestamp: new Date().toISOString()\n    };\n\n    results.push({\n      json: normalizedScan\n    });\n  } catch (normErr) {\n    results.push({\n      json: {\n        status: 'error',\n        error_code: 'MALFORMED_RESPONSE',\n        url: 'unknown',\n        message: 'Failed to normalize target response.',\n        start_time: Date.now(),\n        timestamp: new Date().toISOString()\n      }\n    });\n  }\n}\n\nreturn results;"
+      },
+      "name": "Normalize Response",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        17008,
+        5408
+      ],
+      "id": "bddf6294-5b7c-4191-a404-8946fe1b832c"
+    },
+    {
+      "parameters": {
+        "jsCode": "/* Commit 25: Analyze HTTP Metadata with Fault Protection */\nconst items = $input.all();\nconst results = [];\n\nfor (const item of items) {\n  const data = item.json;\n  if (data.status === 'error') {\n    results.push({ json: data });\n    continue;\n  }\n\n  const statusCode = data.target?.status_code || 0;\n  const contentType = data.metadata?.content_type || '';\n  const isHtml = data.metadata?.is_html || false;\n\n  let statusCategory = 'unknown';\n  if (statusCode >= 100 && statusCode < 200) statusCategory = 'informational';\n  else if (statusCode >= 200 && statusCode < 300) statusCategory = 'success';\n  else if (statusCode >= 300 && statusCode < 400) statusCategory = 'redirection';\n  else if (statusCode >= 400 && statusCode < 500) statusCategory = 'client_error';\n  else if (statusCode >= 500 && statusCode < 600) statusCategory = 'server_error';\n\n  const findings = [];\n\n  if (statusCategory === 'server_error') {\n    findings.push({\n      code: 'SERVER_ERROR_RESPONSE',\n      type: 'operational_risk',\n      severity: 'medium',\n      message: `Target returned HTTP status ${statusCode} (Internal Server Error).`\n    });\n  }\n\n  if (!contentType || contentType === 'unknown') {\n    findings.push({\n      code: 'MISSING_CONTENT_TYPE',\n      type: 'security_header',\n      severity: 'low',\n      message: 'Response is missing a Content-Type header.'\n    });\n  }\n\n  if (isHtml) {\n    findings.push({\n      code: 'HTML_RESPONSE_ON_API',\n      type: 'content_anomaly',\n      severity: 'low',\n      message: 'Target returned an HTML body instead of structured API data.'\n    });\n  }\n\n  results.push({\n    json: {\n      ...data,\n      http_analysis: {\n        status_category: statusCategory,\n        is_success: statusCategory === 'success',\n        metadata_findings: findings,\n        findings_count: findings.length\n      }\n    }\n  });\n}\n\nreturn results;"
+      },
+      "name": "Analyze HTTP Metadata",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        17216,
+        5408
+      ],
+      "id": "f7637b1c-b74b-4a6a-8acc-7b1ceb4b8cce"
+    },
+    {
+      "parameters": {
+        "jsCode": "/* Commit 25: Analyze HTTPS & Transport */\nconst items = $input.all();\nconst results = [];\n\nfor (const item of items) {\n  const data = item.json;\n  if (data.status === 'error') {\n    results.push({ json: data });\n    continue;\n  }\n\n  const urlStr = data.target?.url || '';\n  const isHttps = urlStr.toLowerCase().startsWith('https://');\n  const headers = data.headers || {};\n  const hstsHeader = headers['strict-transport-security'] || null;\n  \n  const findings = [];\n  let hstsDetails = { present: false, max_age_seconds: null, include_subdomains: false, preload: false };\n\n  if (!isHttps) {\n    findings.push({\n      code: 'UNENCRYPTED_TRANSPORT_HTTP',\n      type: 'transport_security',\n      severity: 'high',\n      message: 'Target uses cleartext HTTP.'\n    });\n  } else if (!hstsHeader) {\n    findings.push({\n      code: 'MISSING_HSTS_HEADER',\n      type: 'transport_security',\n      severity: 'low',\n      message: 'Strict-Transport-Security header is missing.'\n    });\n  } else {\n    hstsDetails.present = true;\n  }\n\n  results.push({\n    json: {\n      ...data,\n      https_analysis: {\n        is_https: isHttps,\n        scheme: isHttps ? 'https' : 'http',\n        hsts: hstsDetails,\n        transport_findings: findings,\n        findings_count: findings.length\n      }\n    }\n  });\n}\nreturn results;"
+      },
+      "name": "Analyze HTTPS & Transport",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        17440,
+        5408
+      ],
+      "id": "c4e20ac2-e049-48d3-9f67-3c0b787d37b1"
+    },
+    {
+      "parameters": {
+        "jsCode": "/* Commit 25: Analyze Security Headers */\nconst items = $input.all();\nconst results = [];\nfor (const item of items) {\n  const data = item.json;\n  if (data.status === 'error') { results.push({ json: data }); continue; }\n  const headers = data.headers || {};\n  const findings = [];\n  \n  const xcto = headers['x-content-type-options'];\n  if (!xcto || !xcto.toLowerCase().includes('nosniff')) {\n    findings.push({ code: 'MISSING_X_CONTENT_TYPE_OPTIONS', type: 'security_header', severity: 'medium', message: 'X-Content-Type-Options header is missing or not set to nosniff.' });\n  }\n\n  const xfo = headers['x-frame-options'];\n  if (!xfo) {\n    findings.push({ code: 'MISSING_X_FRAME_OPTIONS', type: 'security_header', severity: 'low', message: 'X-Frame-Options header is missing.' });\n  }\n\n  const csp = headers['content-security-policy'];\n  if (!csp) {\n    findings.push({ code: 'MISSING_CONTENT_SECURITY_POLICY', type: 'security_header', severity: 'low', message: 'Content-Security-Policy header is missing.' });\n  }\n\n  results.push({\n    json: {\n      ...data,\n      security_headers_analysis: {\n        headers_evaluated: {\n          x_content_type_options: xcto || null,\n          x_frame_options: xfo || null,\n          content_security_policy: csp ? 'present' : null\n        },\n        header_findings: findings,\n        findings_count: findings.length\n      }\n    }\n  });\n}\nreturn results;"
+      },
+      "name": "Analyze Security Headers",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        17664,
+        5408
+      ],
+      "id": "5cc4f7a9-98b6-4b38-9425-cf74ef48b904"
+    },
+    {
+      "parameters": {
+        "jsCode": "/* Commit 25: Analyze CORS Configuration */\nconst items = $input.all();\nconst results = [];\nfor (const item of items) {\n  const data = item.json;\n  if (data.status === 'error') { results.push({ json: data }); continue; }\n  const headers = data.headers || {};\n  const findings = [];\n  const allowOrigin = headers['access-control-allow-origin'] || null;\n  if (allowOrigin === '*') {\n    findings.push({ code: 'WILDCARD_CORS_ORIGIN', type: 'cors_configuration', severity: 'low', message: 'Access-Control-Allow-Origin is set to wildcard (*).' });\n  }\n  results.push({\n    json: {\n      ...data,\n      cors_analysis: {\n        cors_evaluated: { allow_origin: allowOrigin },\n        cors_findings: findings,\n        findings_count: findings.length\n      }\n    }\n  });\n}\nreturn results;"
+      },
+      "name": "Analyze CORS Configuration",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        17888,
+        5408
+      ],
+      "id": "68d7412f-09fb-46cc-8757-a83efe6028d1"
+    },
+    {
+      "parameters": {
+        "jsCode": "/* Commit 25: Analyze Information Disclosure */\nconst items = $input.all();\nconst results = [];\nfor (const item of items) {\n  const data = item.json;\n  if (data.status === 'error') { results.push({ json: data }); continue; }\n  const headers = data.headers || {};\n  const findings = [];\n  const server = headers['server'];\n  const poweredBy = headers['x-powered-by'];\n  \n  if (server) {\n    findings.push({ code: 'SERVER_HEADER_EXPOSED', type: 'info_disclosure', severity: 'low', message: `Server header exposed: ${server}` });\n  }\n  if (poweredBy) {\n    findings.push({ code: 'X_POWERED_BY_EXPOSED', type: 'info_disclosure', severity: 'low', message: `X-Powered-By header exposed: ${poweredBy}` });\n  }\n\n  const techDetected = [];\n  if (server) techDetected.push(server);\n  if (poweredBy) techDetected.push(poweredBy);\n\n  results.push({\n    json: {\n      ...data,\n      info_disclosure_analysis: {\n        technologies_detected: techDetected,\n        disclosure_findings: findings,\n        findings_count: findings.length\n      }\n    }\n  });\n}\nreturn results;"
+      },
+      "name": "Analyze Information Disclosure",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        18112,
+        5408
+      ],
+      "id": "5dc3d407-ef8b-4883-a619-1d47cdac0774"
+    },
+    {
+      "parameters": {
+        "jsCode": "/* Commit 25: Analyze Error Exposure */\nconst items = $input.all();\nconst results = [];\nfor (const item of items) {\n  const data = item.json;\n  if (data.status === 'error') { results.push({ json: data }); continue; }\n  \n  const findings = [];\n  const bodySnippet = data._internal_body_snippet || '';\n  \n  if (/stack\\s*trace|exception|traceback|syntaxerror|fatal\\s*error/i.test(bodySnippet)) {\n    findings.push({\n      code: 'VERBOSE_ERROR_TRACE_EXPOSED',\n      type: 'error_exposure',\n      severity: 'medium',\n      message: 'Response body contains verbose exception or stack trace details.'\n    });\n  }\n\n  const cleanData = { ...data };\n  delete cleanData._internal_body_snippet;\n\n  results.push({\n    json: {\n      ...cleanData,\n      error_exposure_analysis: {\n        error_exposure_findings: findings,\n        findings_count: findings.length\n      }\n    }\n  });\n}\nreturn results;"
+      },
+      "name": "Analyze Error Exposure",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        18336,
+        5408
+      ],
+      "id": "63df0cb7-ad47-484d-9523-f61a7a163ce9"
+    },
+    {
+      "parameters": {
+        "jsCode": "/* Commit 25: Analyze Rate Limits */\nconst items = $input.all();\nconst results = [];\nfor (const item of items) {\n  const data = item.json;\n  if (data.status === 'error') { results.push({ json: data }); continue; }\n  \n  const headers = data.headers || {};\n  const hasRateLimitHeaders = Object.keys(headers).some(h => \n    h.includes('ratelimit') || h.includes('retry-after')\n  );\n\n  const findings = [];\n  if (!hasRateLimitHeaders) {\n    findings.push({\n      code: 'MISSING_RATE_LIMIT_HEADERS',\n      type: 'rate_limiting',\n      severity: 'low',\n      message: 'No rate-limiting headers detected in HTTP response.'\n    });\n  }\n\n  results.push({\n    json: {\n      ...data,\n      rate_limit_analysis: {\n        has_rate_limit_headers: hasRateLimitHeaders,\n        rate_limit_findings: findings,\n        findings_count: findings.length\n      }\n    }\n  });\n}\nreturn results;"
+      },
+      "name": "Analyze Rate Limits",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        18560,
+        5408
+      ],
+      "id": "25a7a871-e2ff-4c22-867b-d830202ed559"
+    },
+    {
+      "parameters": {
+        "jsCode": "/* Commit 25: Analyze JSON Quality */\nconst items = $input.all();\nconst results = [];\nfor (const item of items) {\n  const data = item.json;\n  if (data.status === 'error') { results.push({ json: data }); continue; }\n  \n  const isJson = data.metadata?.is_json || false;\n  const findings = [];\n  \n  if (!isJson) {\n    findings.push({\n      code: 'NON_JSON_RESPONSE_FORMAT',\n      type: 'json_quality',\n      severity: 'low',\n      message: 'Target response content-type is not JSON.'\n    });\n  }\n\n  results.push({\n    json: {\n      ...data,\n      json_quality_analysis: {\n        summary: { is_valid_json: isJson },\n        quality_findings: findings,\n        findings_count: findings.length\n      }\n    }\n  });\n}\nreturn results;"
+      },
+      "name": "Analyze JSON Quality",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        18784,
+        5408
+      ],
+      "id": "28b1cc74-dcd8-4568-908d-2704b2ef3c4d"
+    },
+    {
+      "parameters": {
+        "jsCode": "/* Commit 25: Unified Findings Engine */\nconst items = $input.all();\nconst results = [];\nfor (const item of items) {\n  const data = item.json;\n  if (data.status === 'error') { results.push({ json: data }); continue; }\n  \n  const rawFindings = [\n    ...(data.http_analysis?.metadata_findings || []),\n    ...(data.https_analysis?.transport_findings || []),\n    ...(data.security_headers_analysis?.header_findings || []),\n    ...(data.cors_analysis?.cors_findings || []),\n    ...(data.info_disclosure_analysis?.disclosure_findings || []),\n    ...(data.error_exposure_analysis?.error_exposure_findings || []),\n    ...(data.rate_limit_analysis?.rate_limit_findings || []),\n    ...(data.json_quality_analysis?.quality_findings || [])\n  ];\n\n  const unifiedFindings = rawFindings.map((f, idx) => ({\n    id: f.code?.toLowerCase() || `finding_${idx+1}`,\n    category: f.type || 'security',\n    severity: f.severity || 'low',\n    title: f.code?.replace(/_/g, ' ') || 'Finding',\n    description: f.message || '',\n    source: 'deterministic'\n  }));\n\n  results.push({\n    json: {\n      ...data,\n      unified_findings: {\n        total_findings: unifiedFindings.length,\n        findings: unifiedFindings\n      }\n    }\n  });\n}\nreturn results;"
+      },
+      "name": "Unified Findings Engine",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        19008,
+        5408
+      ],
+      "id": "dfe0e7e8-c0a6-455d-8945-213f243c7a8b"
+    },
+    {
+      "parameters": {
+        "jsCode": "/* Commit 25: Risk Scoring Engine */\nconst items = $input.all();\nconst results = [];\nfor (const item of items) {\n  const data = item.json;\n  if (data.status === 'error') { results.push({ json: data }); continue; }\n  \n  const findings = data.unified_findings?.findings || [];\n  let penalty = findings.reduce((acc, f) => acc + (f.severity === 'high' ? 15 : f.severity === 'medium' ? 8 : 3), 0);\n  const score = Math.max(0, 100 - penalty);\n  let rating = score >= 90 ? 'Excellent' : score >= 75 ? 'Good' : score >= 60 ? 'Needs Improvement' : 'Critical';\n\n  results.push({\n    json: {\n      ...data,\n      risk_scoring: { score, rating, total_penalty_points: penalty }\n    }\n  });\n}\nreturn results;"
+      },
+      "name": "Risk Scoring Engine",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        19232,
+        5408
+      ],
+      "id": "202c7982-c510-49e0-a326-d811edc5341b"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ \"Analyze this API security scan result: Risk Score: \" + $json.risk_scoring.score + \"/100 (\" + $json.risk_scoring.rating + \"). Total Security Findings: \" + $json.unified_findings.total_findings + \". Provide a brief expert recommendation based strictly on the provided data.\" }}",
+        "options": {
+          "systemMessage": "You are a secure API advisor. Never invent vulnerabilities or leak internal credentials."
+        }
+      },
+      "name": "Groq AI Analysis",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.7,
+      "position": [
+        19472,
+        5408
+      ],
+      "id": "5d260636-fcfe-434a-9238-a2779b31b9da",
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "model": "openai/gpt-oss-safeguard-20b",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGroq",
+      "typeVersion": 1,
+      "position": [
+        19440,
+        5616
+      ],
+      "id": "49a78771-b373-45a0-8123-5def7f7ab266",
+      "name": "Groq Chat Model"
+    },
+    {
+      "parameters": {
+        "jsCode": "/* Commit 25: Centralized AI Fallback & Failure Formatter */\nconst items = $input.all();\nconst results = [];\n\nfor (const item of items) {\n  const data = item.json;\n  if (data.status === 'error') {\n    results.push({ json: data });\n    continue;\n  }\n\n  const isAiError = data.error || !data.output;\n  let aiSummary = isAiError \n    ? 'AI analysis unavailable or unconfigured. Audit conclusions rely strictly on deterministic static analysis rules.' \n    : data.output;\n\n  const finalPayload = {\n    ...data,\n    ai_analysis: {\n      status: isAiError ? 'unavailable' : 'completed',\n      summary: aiSummary\n    }\n  };\n\n  delete finalPayload.output;\n  delete finalPayload.error;\n\n  results.push({ json: finalPayload });\n}\n\nreturn results;"
+      },
+      "name": "AI Fallback Formatter",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        19808,
+        5408
+      ],
+      "id": "b65acdd4-acd7-4e8d-8271-09f605cd053f"
+    },
+    {
+      "parameters": {
+        "jsCode": "/* Commit 25: HTML Report Generator - Production Cleaned */\nconst items = $input.all();\nconst results = [];\n\nfor (const item of items) {\n  const data = item.json;\n  const executionCompletedAt = new Date().toISOString();\n  const scanId = data.scan_metadata?.scan_id || ('scan_' + Math.random().toString(36).substring(2, 10) + '_' + Date.now().toString(36));\n\n  if (data.status === 'error') {\n    const errCode = data.error_code || 'SCAN_ERROR';\n    const errMsg = data.message || 'An error occurred during scan execution.';\n    \n    const errorHtml = `<!DOCTYPE html>\n<html lang=\"en\">\n<head><meta charset=\"UTF-8\"><title>Security Scan Error - ${scanId}</title>\n<style>body{font-family:sans-serif;background:#0f172a;color:#fff;padding:2rem;} .card{background:#1e293b;padding:2rem;border-radius:8px;border-left:5px solid #ef4444;}</style>\n</head>\n<body><div class=\"card\"><h1>Scan Failed</h1><p><strong>Scan ID:</strong> ${scanId}</p><p><strong>Error Code:</strong> ${errCode}</p><p><strong>Message:</strong> ${errMsg}</p></div></body>\n</html>`;\n\n    results.push({\n      json: {\n        ...data,\n        html_report: errorHtml\n      }\n    });\n    continue;\n  }\n\n  const targetUrl = data.target?.url || data.url || 'unknown';\n  const score = typeof data.risk_scoring?.score === 'number' ? data.risk_scoring.score : 100;\n  const rating = data.risk_scoring?.rating || 'Excellent';\n  const summary = data.ai_analysis?.summary || '';\n  const findings = data.unified_findings?.findings || [];\n  const disclaimer = 'Passive API Security Auditor is designed for non-destructive inspection only.';\n\n  const highCount = findings.filter(f => f.severity === 'high').length;\n  const mediumCount = findings.filter(f => f.severity === 'medium').length;\n  const lowCount = findings.filter(f => f.severity === 'low').length;\n\n  const findingsRows = findings.length > 0 \n    ? findings.map(f => `<tr><td><span class=\"badge ${f.severity}\">${f.severity.toUpperCase()}</span></td><td>${f.title}</td><td>${f.description}</td><td>${f.category}</td></tr>`).join('')\n    : '<tr><td colspan=\"4\" style=\"text-align:center;color:#888;\">No security findings detected. Clean scan!</td></tr>';\n\n  const professionalHtml = `<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n<meta charset=\"UTF-8\">\n<title>API Security Audit Report - ${scanId}</title>\n<style>\n  :root { --bg: #0f172a; --card: #1e293b; --text: #f8fafc; --muted: #94a3b8; --border: #334155; }\n  body { font-family: -apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, sans-serif; background: var(--bg); color: var(--text); margin: 0; padding: 2rem; }\n  .container { max-width: 900px; margin: auto; }\n  .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border); padding-bottom: 1rem; margin-bottom: 2rem; }\n  .card { background: var(--card); border-radius: 12px; padding: 1.5rem; margin-bottom: 1.5rem; border: 1px solid var(--border); }\n  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; }\n  .score-box { font-size: 2.5rem; font-weight: bold; color: ${score >= 75 ? '#22c55e' : score >= 50 ? '#eab308' : '#ef4444'}; }\n  table { width: 100%; border-collapse: collapse; margin-top: 1rem; }\n  th, td { text-align: left; padding: 10px; border-bottom: 1px solid var(--border); font-size: 0.95rem; }\n  th { color: var(--muted); }\n  .badge { padding: 4px 8px; border-radius: 4px; font-size: 0.75rem; font-weight: bold; }\n  .badge.high { background: #7f1d1d; color: #fca5a5; }\n  .badge.medium { background: #78350f; color: #fde68a; }\n  .badge.low { background: #14532d; color: #86efac; }\n  .footer { text-align: center; color: var(--muted); font-size: 0.85rem; margin-top: 3rem; }\n</style>\n</head>\n<body>\n<div class=\"container\">\n  <div class=\"header\">\n    <h1>API Security Audit Report</h1>\n    <div><strong>Scan ID:</strong> ${scanId}</div>\n  </div>\n  <div class=\"card\">\n    <h3>Target Overview</h3>\n    <p><strong>Target URL:</strong> <a href=\"${targetUrl}\" target=\"_blank\" style=\"color:#38bdf8;\">${targetUrl}</a></p>\n    <p><strong>Timestamp:</strong> ${executionCompletedAt}</p>\n    <div class=\"grid\">\n      <div><div>Risk Score</div><div class=\"score-box\">${score}/100</div></div>\n      <div><div>Rating</div><div style=\"font-size:1.5rem;font-weight:600;margin-top:10px;\">${rating}</div></div>\n      <div><div>Severity Counts</div><p style=\"margin:5px 0;\">High: ${highCount} | Med: ${mediumCount} | Low: ${lowCount}</p></div>\n    </div>\n  </div>\n  <div class=\"card\">\n    <h3>Executive Summary &amp; Recommendations</h3>\n    <p style=\"line-height:1.6;white-space:pre-line;\">${summary}</p>\n  </div>\n  <div class=\"card\">\n    <h3>Security Findings</h3>\n    <table>\n      <thead><tr><th>Severity</th><th>Finding</th><th>Description</th><th>Category</th></tr></thead>\n      <tbody>${findingsRows}</tbody>\n    </table>\n  </div>\n  <div class=\"footer\"><p>${disclaimer}</p></div>\n</div>\n</body>\n</html>`;\n\n  results.push({\n    json: {\n      ...data,\n      html_report: professionalHtml\n    }\n  });\n}\n\nreturn results;"
+      },
+      "name": "HTML Report Generator",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        20288,
+        5408
+      ],
+      "id": "78e27e42-8e25-4ecf-ab99-329dca32dece"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($json) }}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "name": "Respond Webhook",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        20528,
+        5408
+      ],
+      "id": "c443db97-7594-4b2d-98cc-95c23e56bd68"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($json) }}",
+        "options": {
+          "responseCode": 400
+        }
+      },
+      "name": "Respond Validation Error",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        16768,
+        5632
+      ],
+      "id": "cbea923e-5bde-4f9b-b42e-198aedef4d94"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Validate Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Input": {
+      "main": [
+        [
+          {
+            "node": "IF Valid Target",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF Valid Target": {
+      "main": [
+        [
+          {
+            "node": "Safe GET Scan Target",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond Validation Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Safe GET Scan Target": {
+      "main": [
+        [
+          {
+            "node": "Normalize Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize Response": {
+      "main": [
+        [
+          {
+            "node": "Analyze HTTP Metadata",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Analyze HTTP Metadata": {
+      "main": [
+        [
+          {
+            "node": "Analyze HTTPS & Transport",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Analyze HTTPS & Transport": {
+      "main": [
+        [
+          {
+            "node": "Analyze Security Headers",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Analyze Security Headers": {
+      "main": [
+        [
+          {
+            "node": "Analyze CORS Configuration",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Analyze CORS Configuration": {
+      "main": [
+        [
+          {
+            "node": "Analyze Information Disclosure",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Analyze Information Disclosure": {
+      "main": [
+        [
+          {
+            "node": "Analyze Error Exposure",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Analyze Error Exposure": {
+      "main": [
+        [
+          {
+            "node": "Analyze Rate Limits",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Analyze Rate Limits": {
+      "main": [
+        [
+          {
+            "node": "Analyze JSON Quality",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Analyze JSON Quality": {
+      "main": [
+        [
+          {
+            "node": "Unified Findings Engine",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Unified Findings Engine": {
+      "main": [
+        [
+          {
+            "node": "Risk Scoring Engine",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Risk Scoring Engine": {
+      "main": [
+        [
+          {
+            "node": "Groq AI Analysis",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Groq Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Groq AI Analysis",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Groq AI Analysis": {
+      "main": [
+        [
+          {
+            "node": "AI Fallback Formatter",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Fallback Formatter": {
+      "main": [
+        [
+          {
+            "node": "HTML Report Generator",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTML Report Generator": {
+      "main": [
+        [
+          {
+            "node": "Respond Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "bcc209f0-2627-4b14-9afd-89d53150854e",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "57e38e0823d9650c72738d7ec9970330dda35dd35e696a01928746b0b19668c4"
+  },
+  "nodeGroups": [],
+  "id": "vPJ4DLi0BvPYLEzD",
+  "tags": []
+}
