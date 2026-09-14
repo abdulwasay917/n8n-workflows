@@ -1,0 +1,280 @@
+{
+  "name": "Multi-Source Price Monitoring & Arbitrage Alert System (Fixed Loss Logic)",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 5
+            }
+          ]
+        }
+      },
+      "id": "dfa81449-1ff4-482d-a6db-a6340ab9b7eb",
+      "name": "Schedule Trigger (5m)",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [200, 752]
+    },
+    {
+      "parameters": {
+        "url": "https://api.binance.com/api/v3/depth?symbol=BTCUSDT&limit=5",
+        "options": {}
+      },
+      "id": "704c3d46-09c2-4b13-9600-0b536da31507",
+      "name": "Fetch Binance Orderbook & 24h Data",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [480, 552],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "url": "https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd",
+        "options": {}
+      },
+      "id": "e4b624bd-1e96-45ee-8a54-54956dfe0a87",
+      "name": "Fetch CoinGecko BTC/USD",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [480, 652],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "url": "https://api.kraken.com/0/public/Ticker?pair=XBTUSD",
+        "options": {}
+      },
+      "id": "f3a14b5c-8901-4c12-9e87-112233445566",
+      "name": "Fetch Kraken Ticker Data",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [480, 752],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "url": "https://api.coinbase.com/v2/prices/BTC-USD/spot",
+        "options": {}
+      },
+      "id": "a1b2c3d4-e5f6-4a7b-8c9d-0123456789ab",
+      "name": "Fetch Coinbase BTC/USD",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [480, 852],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "url": "https://api.kucoin.com/api/v1/market/orderbook/level1?symbol=BTC-USDT",
+        "options": {}
+      },
+      "id": "b2c3d4e5-f6a7-4b8c-9d0e-123456789abc",
+      "name": "Fetch KuCoin Orderbook Data",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [480, 952],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combinationMode": "multiplex",
+        "options": {}
+      },
+      "id": "a1c2e3f4-5b6c-7d8e-9f0a-112233445566",
+      "name": "Merge Exchange Data",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 2.1,
+      "position": [720, 752]
+    },
+    {
+      "parameters": {
+        "jsCode": "function getNodeResult(nodeName) {\n  try {\n    const nodeItems = $(nodeName).all();\n    if (nodeItems && nodeItems.length > 0) {\n      return nodeItems[0].json || {};\n    }\n    return {};\n  } catch (e) {\n    return {};\n  }\n}\n\n// Fetch raw responses\nconst binanceRaw = getNodeResult(\"Fetch Binance Orderbook & 24h Data\");\nconst geckoRaw = getNodeResult(\"Fetch CoinGecko BTC/USD\");\nconst krakenRaw = getNodeResult(\"Fetch Kraken Ticker Data\");\nconst coinbaseRaw = getNodeResult(\"Fetch Coinbase BTC/USD\");\nconst kucoinRaw = getNodeResult(\"Fetch KuCoin Orderbook Data\");\n\n// Extract Prices\nconst binanceAsk = parseFloat(binanceRaw.asks?.[0]?.[0] || binanceRaw.price || 0);\nconst binanceBid = parseFloat(binanceRaw.bids?.[0]?.[0] || binanceRaw.price || 0);\nconst binancePrice = (binanceAsk + binanceBid) / 2 || parseFloat(binanceRaw.price || 0);\n\nconst geckoPrice = parseFloat(geckoRaw.bitcoin?.usd || 0);\nconst geckoAsk = geckoPrice;\nconst geckoBid = geckoPrice;\n\nconst krakenData = krakenRaw.result?.XXBTZUSD || krakenRaw.result?.XBTUSD || {};\nconst krakenAsk = parseFloat(krakenData.a?.[0] || 0);\nconst krakenBid = parseFloat(krakenData.b?.[0] || 0);\nconst krakenPrice = parseFloat(krakenData.c?.[0] || (krakenAsk + krakenBid) / 2 || 0);\n\nconst coinbasePrice = parseFloat(coinbaseRaw.data?.amount || 0);\nconst coinbaseAsk = coinbasePrice;\nconst coinbaseBid = coinbasePrice;\n\nconst kucoinAsk = parseFloat(kucoinRaw.data?.bestAsk || kucoinRaw.data?.price || 0);\nconst kucoinBid = parseFloat(kucoinRaw.data?.bestBid || kucoinRaw.data?.price || 0);\nconst kucoinPrice = parseFloat(kucoinRaw.data?.price || (kucoinAsk + kucoinBid) / 2 || 0);\n\nconst exchanges = [\n  { exchange: \"Binance\", price: binancePrice, ask: binanceAsk, bid: binanceBid },\n  { exchange: \"CoinGecko\", price: geckoPrice, ask: geckoAsk, bid: geckoBid },\n  { exchange: \"Kraken\", price: krakenPrice, ask: krakenAsk, bid: krakenBid },\n  { exchange: \"Coinbase\", price: coinbasePrice, ask: coinbaseAsk, bid: coinbaseBid },\n  { exchange: \"KuCoin\", price: kucoinPrice, ask: kucoinAsk, bid: kucoinBid }\n].filter(p => p.price > 0 && !isNaN(p.price) && p.ask > 0 && p.bid > 0);\n\nif (exchanges.length < 2) {\n  throw new Error(`Unable to parse enough valid exchange prices.`);\n}\n\nconst minExchange = exchanges.reduce((min, p) => p.ask < min.ask ? p : min, exchanges[0]);\nconst maxExchange = exchanges.reduce((max, p) => p.bid > max.bid ? p : max, exchanges[0]);\n\nconst buyPrice = minExchange.ask;\nconst sellPrice = maxExchange.bid;\n\n// Fee Calculations (1 BTC Basis)\nconst buyFeeRate = 0.001;\nconst sellFeeRate = 0.001;\nconst btcTransferFee = 0.0002;\n\nconst buyFeeUSD = buyPrice * buyFeeRate;\nconst sellFeeUSD = sellPrice * sellFeeRate;\nconst transferFeeUSD = btcTransferFee * buyPrice;\nconst totalFeesUSD = buyFeeUSD + sellFeeUSD + transferFeeUSD;\n\nconst rawSpread = sellPrice - buyPrice;\nconst netProfitAmount = rawSpread - totalFeesUSD;\nconst netProfitPercentage = buyPrice > 0 ? (netProfitAmount / buyPrice) * 100 : 0;\nconst spreadPercentage = buyPrice > 0 ? (rawSpread / buyPrice) * 100 : 0;\n\nreturn [{\n  json: {\n    binancePrice,\n    geckoPrice,\n    krakenPrice,\n    coinbasePrice,\n    kucoinPrice,\n    minExchange: minExchange.exchange,\n    minPrice: buyPrice,\n    maxExchange: maxExchange.exchange,\n    maxPrice: sellPrice,\n    rawSpread: parseFloat(rawSpread.toFixed(2)),\n    spreadPercentage: parseFloat(spreadPercentage.toFixed(4)),\n    buyFeeUSD: parseFloat(buyFeeUSD.toFixed(2)),\n    sellFeeUSD: parseFloat(sellFeeUSD.toFixed(2)),\n    transferFeeUSD: parseFloat(transferFeeUSD.toFixed(2)),\n    totalFeesUSD: parseFloat(totalFeesUSD.toFixed(2)),\n    netProfitAmount: parseFloat(netProfitAmount.toFixed(2)),\n    netProfitPercentage: parseFloat(netProfitPercentage.toFixed(4)),\n    isNetProfitable: netProfitAmount > 0,\n    timestamp: new Date().toISOString()\n  }\n}];"
+      },
+      "id": "1b5a3d7f-f69a-4043-b36c-0ca652425a86",
+      "name": "Calculate Arbitrage Spread",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [950, 752]
+    },
+    {
+      "parameters": {
+        "dataType": "number",
+        "value1": "={{ $json.netProfitPercentage }}",
+        "rules": {
+          "rules": [
+            {
+              "operation": "larger",
+              "value2": 3,
+              "output": 0
+            },
+            {
+              "operation": "largerEqual",
+              "value2": 1,
+              "output": 1
+            },
+            {
+              "operation": "largerEqual",
+              "value2": 0,
+              "output": 2
+            }
+          ]
+        },
+        "fallbackOutput": 3
+      },
+      "id": "c1f2e3d4-5a6b-7c8d-9e0f-112233445566",
+      "name": "Route Profit Tier",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 1,
+      "position": [1150, 752]
+    },
+    {
+      "parameters": {
+        "sendTo": "abdulwasayrao917@gmail.com",
+        "subject": "🚨 URGENT: High Net Profit Arbitrage Opportunity ({{ $json.netProfitPercentage }}%)",
+        "message": "=<div style=\"font-family: Arial, sans-serif; max-width: 650px; margin: 0 auto; border: 3px solid #DC2626; border-radius: 8px; overflow: hidden; background-color: #ffffff;\"><div style=\"background-color: #DC2626; color: #ffffff; padding: 20px; text-align: center;\"><h2 style=\"margin: 0; font-size: 22px; font-weight: bold;\">🚨 URGENT HIGH-PROFIT ARBITRAGE ALERT</h2><span style=\"display: inline-block; background-color: #7F1D1D; color: #FEE2E2; padding: 6px 16px; border-radius: 12px; font-size: 13px; font-weight: bold; margin-top: 10px;\">NET PROFIT: +${{ $json.netProfitAmount }} ({{ $json.netProfitPercentage }}%)</span></div><div style=\"padding: 24px;\"><div style=\"background-color: #FEF2F2; padding: 15px; border-left: 4px solid #EF4444; border-radius: 4px; margin-bottom: 20px;\"><h3 style=\"margin: 0 0 8px 0; color: #991B1B;\">Exceptional Profit Spread Detected (>3%)!</h3><p style=\"margin: 0; color: #7F1D1D; font-size: 14px;\">Buy on <strong>{{ $json.minExchange }}</strong> at <strong>${{ $json.minPrice }}</strong> and sell on <strong>{{ $json.maxExchange }}</strong> at <strong>${{ $json.maxPrice }}</strong>.<br>Raw Spread: <strong>${{ $json.rawSpread }}</strong> | Total Fees: <strong>${{ $json.totalFeesUSD }}</strong> | <strong>Real Net Profit: ${{ $json.netProfitAmount }}</strong></p></div><h4 style=\"margin-top: 20px; margin-bottom: 10px; color: #374151;\">Fee Breakdown:</h4><table style=\"width: 100%; border-collapse: collapse; margin-bottom: 20px; font-size: 14px;\"><tbody><tr><td style=\"padding: 6px 0; color: #6B7280;\">Buy Fee (0.1%):</td><td style=\"padding: 6px 0; text-align: right;\">${{ $json.buyFeeUSD }}</td></tr><tr><td style=\"padding: 6px 0; color: #6B7280;\">Sell Fee (0.1%):</td><td style=\"padding: 6px 0; text-align: right;\">${{ $json.sellFeeUSD }}</td></tr><tr><td style=\"padding: 6px 0; color: #6B7280;\">Transfer Fee (~0.0002 BTC):</td><td style=\"padding: 6px 0; text-align: right;\">${{ $json.transferFeeUSD }}</td></tr><tr style=\"border-top: 1px solid #E5E7EB;\"><td style=\"padding: 6px 0; font-weight: bold;\">Total Deducted Fees:</td><td style=\"padding: 6px 0; font-weight: bold; color: #DC2626; text-align: right;\">-${{ $json.totalFeesUSD }}</td></tr></tbody></table><div style=\"font-size: 12px; color: #9CA3AF; text-align: center;\">Alert Timestamp: {{ $json.timestamp }} | n8n Multi-Exchange System</div></div></div>",
+        "options": {},
+        "emailType": "html"
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [1400, 580],
+      "id": "bf487adf-60bd-4e84-84d9-df674ce1558b",
+      "name": "Send Urgent High Profit Alert",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "Sa0TvK34qq1ZFXSl",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sendTo": "abdulwasayrao917@gmail.com",
+        "subject": "📈 Normal Arbitrage Alert: {{ $json.netProfitPercentage }}% Net Profit",
+        "message": "=<div style=\"font-family: Arial, sans-serif; max-width: 650px; margin: 0 auto; border: 2px solid #10B981; border-radius: 8px; overflow: hidden; background-color: #ffffff;\"><div style=\"background-color: #059669; color: #ffffff; padding: 20px; text-align: center;\"><h2 style=\"margin: 0; font-size: 20px; font-weight: bold;\">📈 NORMAL NET PROFITABLE ARBITRAGE ALERT</h2><span style=\"display: inline-block; background-color: #065F46; color: #D1FAE5; padding: 6px 16px; border-radius: 12px; font-size: 13px; font-weight: bold; margin-top: 10px;\">NET PROFIT: +${{ $json.netProfitAmount }} ({{ $json.netProfitPercentage }}%)</span></div><div style=\"padding: 24px;\"><div style=\"background-color: #ECFDF5; padding: 15px; border-left: 4px solid #10B981; border-radius: 4px; margin-bottom: 20px;\"><h3 style=\"margin: 0 0 8px 0; color: #065F46;\">Moderate Arbitrage Profit Opportunity (1% - 3%)</h3><p style=\"margin: 0; color: #047857; font-size: 14px;\">Buy on <strong>{{ $json.minExchange }}</strong> at <strong>${{ $json.minPrice }}</strong> and sell on <strong>{{ $json.maxExchange }}</strong> at <strong>${{ $json.maxPrice }}</strong>.<br>Raw Spread: <strong>${{ $json.rawSpread }}</strong> | Total Fees: <strong>${{ $json.totalFeesUSD }}</strong> | <strong>Real Net Profit: ${{ $json.netProfitAmount }}</strong></p></div><h4 style=\"margin-top: 20px; margin-bottom: 10px; color: #374151;\">Fee Breakdown:</h4><table style=\"width: 100%; border-collapse: collapse; margin-bottom: 20px; font-size: 14px;\"><tbody><tr><td style=\"padding: 6px 0; color: #6B7280;\">Buy Fee (0.1%):</td><td style=\"padding: 6px 0; text-align: right;\">${{ $json.buyFeeUSD }}</td></tr><tr><td style=\"padding: 6px 0; color: #6B7280;\">Sell Fee (0.1%):</td><td style=\"padding: 6px 0; text-align: right;\">${{ $json.sellFeeUSD }}</td></tr><tr><td style=\"padding: 6px 0; color: #6B7280;\">Transfer Fee (~0.0002 BTC):</td><td style=\"padding: 6px 0; text-align: right;\">${{ $json.transferFeeUSD }}</td></tr><tr style=\"border-top: 1px solid #E5E7EB;\"><td style=\"padding: 6px 0; font-weight: bold;\">Total Deducted Fees:</td><td style=\"padding: 6px 0; font-weight: bold; color: #DC2626; text-align: right;\">-${{ $json.totalFeesUSD }}</td></tr></tbody></table><div style=\"font-size: 12px; color: #9CA3AF; text-align: center;\">Alert Timestamp: {{ $json.timestamp }} | n8n Multi-Exchange System</div></div></div>",
+        "options": {},
+        "emailType": "html"
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [1400, 700],
+      "id": "e2d3c4b5-6a7b-8c9d-0e1f-223344556677",
+      "name": "Send Normal Profit Alert",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "Sa0TvK34qq1ZFXSl",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sendTo": "abdulwasayrao917@gmail.com",
+        "subject": "📊 BTC Multi-Exchange Report - Low Net Profit (0% to 1%)",
+        "message": "=<div style=\"font-family: Arial, sans-serif; max-width: 650px; margin: 0 auto; border: 1px solid #e0e0e0; border-radius: 8px; overflow: hidden; background-color: #ffffff;\"><div style=\"background-color: #3B82F6; color: #ffffff; padding: 20px; text-align: center;\"><h2 style=\"margin: 0; font-size: 20px;\">BTC Multi-Exchange Arbitrage Report</h2><span style=\"display: inline-block; background-color: #1D4ED8; color: #ffffff; padding: 4px 12px; border-radius: 12px; font-size: 12px; font-weight: bold; margin-top: 8px;\">LOW PROFIT RANGE (0% - 1%)</span></div><div style=\"padding: 24px;\"><p style=\"color: #4B5563; font-size: 14px; margin-bottom: 20px;\">Trade is slightly profitable after fees, but below the 1% alert threshold.</p><div style=\"background-color: #F0F9FF; padding: 15px; border-radius: 6px; border: 1px solid #BAE6FD; margin-bottom: 20px;\"><table style=\"width: 100%; border-collapse: collapse; font-size: 14px;\"><tr><td style=\"padding: 6px 0; color: #6B7280;\">Best Buy Exchange:</td><td style=\"padding: 6px 0; font-weight: bold; color: #059669; text-align: right;\">{{ $json.minExchange }} (${{ $json.minPrice }})</td></tr><tr><td style=\"padding: 6px 0; color: #6B7280;\">Best Sell Exchange:</td><td style=\"padding: 6px 0; font-weight: bold; color: #DC2626; text-align: right;\">{{ $json.maxExchange }} (${{ $json.maxPrice }})</td></tr><tr><td style=\"padding: 6px 0; color: #6B7280;\">Raw Market Spread:</td><td style=\"padding: 6px 0; font-weight: bold; color: #111827; text-align: right;\">${{ $json.rawSpread }} ({{ $json.spreadPercentage }}%)</td></tr><tr><td style=\"padding: 6px 0; color: #6B7280;\">Total Fees:</td><td style=\"padding: 6px 0; font-weight: bold; color: #EF4444; text-align: right;\">-${{ $json.totalFeesUSD }}</td></tr><tr><td style=\"padding: 6px 0; color: #6B7280;\">Net Profit:</td><td style=\"padding: 6px 0; font-weight: bold; color: #059669; text-align: right;\">+${{ $json.netProfitAmount }} ({{ $json.netProfitPercentage }}%)</td></tr></table></div><div style=\"font-size: 12px; color: #9CA3AF; text-align: center;\">Timestamp: {{ $json.timestamp }} | n8n Multi-Exchange System</div></div></div>",
+        "options": {
+          "appendAttribution": false
+        },
+        "emailType": "html"
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [1400, 820],
+      "id": "8e3dcd3e-9247-46ba-a2a9-c49bf77ad416",
+      "name": "Send Regular Report",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "Sa0TvK34qq1ZFXSl",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sendTo": "abdulwasayrao917@gmail.com",
+        "subject": "⚠️ BTC Arbitrage Loss Report: {{ $json.netProfitPercentage }}% Net Loss",
+        "message": "=<div style=\"font-family: Arial, sans-serif; max-width: 650px; margin: 0 auto; border: 2px solid #EF4444; border-radius: 8px; overflow: hidden; background-color: #ffffff;\"><div style=\"background-color: #991B1B; color: #ffffff; padding: 20px; text-align: center;\"><h2 style=\"margin: 0; font-size: 20px; font-weight: bold;\">⚠️ ARBITRAGE NET LOSS DETECTED</h2><span style=\"display: inline-block; background-color: #7F1D1D; color: #FEE2E2; padding: 6px 16px; border-radius: 12px; font-size: 13px; font-weight: bold; margin-top: 10px;\">NET LOSS: ${{ $json.netProfitAmount }} ({{ $json.netProfitPercentage }}%)</span></div><div style=\"padding: 24px;\"><div style=\"background-color: #FEF2F2; padding: 15px; border-left: 4px solid #DC2626; border-radius: 4px; margin-bottom: 20px;\"><h3 style=\"margin: 0 0 8px 0; color: #991B1B;\">Unprofitable Trade Opportunity</h3><p style=\"margin: 0; color: #7F1D1D; font-size: 14px;\">Trading and network transfer fees exceed the raw market spread. Executing this trade will result in a loss.</p></div><div style=\"background-color: #F9FAFB; padding: 15px; border-radius: 6px; border: 1px solid #E5E7EB; margin-bottom: 20px;\"><table style=\"width: 100%; border-collapse: collapse; font-size: 14px;\"><tr><td style=\"padding: 6px 0; color: #6B7280;\">Buy Exchange (Lowest Ask):</td><td style=\"padding: 6px 0; font-weight: bold; color: #111827; text-align: right;\">{{ $json.minExchange }} (${{ $json.minPrice }})</td></tr><tr><td style=\"padding: 6px 0; color: #6B7280;\">Sell Exchange (Highest Bid):</td><td style=\"padding: 6px 0; font-weight: bold; color: #111827; text-align: right;\">{{ $json.maxExchange }} (${{ $json.maxPrice }})</td></tr><tr><td style=\"padding: 6px 0; color: #6B7280;\">Raw Market Spread:</td><td style=\"padding: 6px 0; font-weight: bold; color: #059669; text-align: right;\">+${{ $json.rawSpread }} ({{ $json.spreadPercentage }}%)</td></tr><tr><td style=\"padding: 6px 0; color: #6B7280;\">Total Deducted Fees:</td><td style=\"padding: 6px 0; font-weight: bold; color: #DC2626; text-align: right;\">-${{ $json.totalFeesUSD }}</td></tr><tr style=\"border-top: 1px solid #E5E7EB;\"><td style=\"padding: 8px 0; font-weight: bold; color: #991B1B;\">Real Net Loss:</td><td style=\"padding: 8px 0; font-weight: bold; color: #DC2626; text-align: right;\">${{ $json.netProfitAmount }} ({{ $json.netProfitPercentage }}%)</td></tr></table></div><div style=\"font-size: 12px; color: #9CA3AF; text-align: center;\">Alert Timestamp: {{ $json.timestamp }} | n8n Multi-Exchange System</div></div></div>",
+        "options": {},
+        "emailType": "html"
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [1400, 940],
+      "id": "3d4e5f6a-7b8c-9d0e-1f2a-334455667788",
+      "name": "Send Loss Alert",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "Sa0TvK34qq1ZFXSl",
+          "name": "Gmail account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Schedule Trigger (5m)": {
+      "main": [
+        [
+          { "node": "Fetch Binance Orderbook & 24h Data", "type": "main", "index": 0 },
+          { "node": "Fetch CoinGecko BTC/USD", "type": "main", "index": 0 },
+          { "node": "Fetch Kraken Ticker Data", "type": "main", "index": 0 },
+          { "node": "Fetch Coinbase BTC/USD", "type": "main", "index": 0 },
+          { "node": "Fetch KuCoin Orderbook Data", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Fetch Binance Orderbook & 24h Data": {
+      "main": [[{ "node": "Merge Exchange Data", "type": "main", "index": 0 }]]
+    },
+    "Fetch CoinGecko BTC/USD": {
+      "main": [[{ "node": "Merge Exchange Data", "type": "main", "index": 0 }]]
+    },
+    "Fetch Kraken Ticker Data": {
+      "main": [[{ "node": "Merge Exchange Data", "type": "main", "index": 0 }]]
+    },
+    "Fetch Coinbase BTC/USD": {
+      "main": [[{ "node": "Merge Exchange Data", "type": "main", "index": 0 }]]
+    },
+    "Fetch KuCoin Orderbook Data": {
+      "main": [[{ "node": "Merge Exchange Data", "type": "main", "index": 1 }]]
+    },
+    "Merge Exchange Data": {
+      "main": [[{ "node": "Calculate Arbitrage Spread", "type": "main", "index": 0 }]]
+    },
+    "Calculate Arbitrage Spread": {
+      "main": [[{ "node": "Route Profit Tier", "type": "main", "index": 0 }]]
+    },
+    "Route Profit Tier": {
+      "main": [
+        [{ "node": "Send Urgent High Profit Alert", "type": "main", "index": 0 }],
+        [{ "node": "Send Normal Profit Alert", "type": "main", "index": 0 }],
+        [{ "node": "Send Regular Report", "type": "main", "index": 0 }],
+        [{ "node": "Send Loss Alert", "type": "main", "index": 0 }]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  }
+}
