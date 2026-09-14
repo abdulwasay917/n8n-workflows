@@ -1,0 +1,336 @@
+{
+  "name": "XML Data Transformation Hub",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "ab8a227d-7f23-4520-b64d-8d9a2c2bea31",
+        "responseMode": "responseNode",
+        "options": {
+          "allowedOrigins": "*"
+        }
+      },
+      "name": "Webhook Trigger",
+      "type": "n8n-nodes-base.webhook",
+      "position": [
+        -1488,
+        1040
+      ],
+      "typeVersion": 2,
+      "id": "a86c2bcf-27e6-4471-9979-841d98e58372",
+      "webhookId": "ab8a227d-7f23-4520-b64d-8d9a2c2bea31"
+    },
+    {
+      "parameters": {
+        "jsCode": "let results = [];\n\nfor (let item of $input.all()) {\n  try {\n    let body = item.json.body || item.json;\n    let xmlData = body.xml || (typeof body === 'string' ? body : Object.values(body)[0]);\n\n    if (!xmlData || typeof xmlData !== 'string' || xmlData.trim() === '') {\n      results.push({\n        json: {\n          valid: false,\n          error: 'The submitted XML data is empty or missing.',\n          statusCode: 400\n        }\n      });\n      continue;\n    }\n\n    let trimmed = xmlData.trim();\n    if (!trimmed.includes('<') || !trimmed.includes('>')) {\n      results.push({\n        json: {\n          valid: false,\n          error: 'The provided content is not formatted as valid XML syntax.',\n          statusCode: 400\n        }\n      });\n      continue;\n    }\n\n    results.push({\n      json: {\n        valid: true,\n        xml: trimmed\n      }\n    });\n  } catch (error) {\n    results.push({\n      json: {\n        valid: false,\n        error: 'Error processing input: ' + error.message,\n        statusCode: 400\n      }\n    });\n  }\n}\n\nreturn results;"
+      },
+      "name": "Extract & Validate XML Input",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        -1248,
+        1040
+      ],
+      "typeVersion": 1,
+      "id": "bb40b481-4c4c-4869-9af5-39962f3774e5"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "valid-xml-check",
+              "leftValue": "={{ $json.valid }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "name": "If Valid XML",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        -1024,
+        1040
+      ],
+      "id": "33f44e2f-d604-4c56-b92e-deb0eff4e2cb"
+    },
+    {
+      "parameters": {
+        "dataPropertyName": "xml",
+        "options": {
+          "attrkey": "$",
+          "explicitRoot": true,
+          "mergeAttrs": false,
+          "trim": true
+        }
+      },
+      "name": "XML to JSON Parser",
+      "type": "n8n-nodes-base.xml",
+      "position": [
+        -800,
+        912
+      ],
+      "typeVersion": 1,
+      "id": "b459a987-55d8-49ee-9fb4-df1bfa9811b3"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "status-success",
+              "name": "status",
+              "value": "success",
+              "type": "string"
+            },
+            {
+              "id": "format-field",
+              "name": "parsedData",
+              "value": "={{ $json }}",
+              "type": "object"
+            },
+            {
+              "id": "timestamp-field",
+              "name": "transformedAt",
+              "value": "={{ $now.toISO() }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "name": "Format JSON Success Payload",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        -576,
+        912
+      ],
+      "typeVersion": 3.4,
+      "id": "3ceadd89-53a3-4d9f-8899-9f8145a4435e"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($json) }}",
+        "options": {
+          "responseCode": 200,
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Access-Control-Allow-Origin",
+                "value": "*"
+              },
+              {
+                "name": "Content-Type",
+                "value": "application/json"
+              }
+            ]
+          }
+        }
+      },
+      "name": "Respond Webhook (Success)",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        -352,
+        912
+      ],
+      "id": "c443db97-7594-4b2d-98cc-95c23e56bd68"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "status-error",
+              "name": "status",
+              "value": "error",
+              "type": "string"
+            },
+            {
+              "id": "message-error",
+              "name": "message",
+              "value": "={{ $json.error || 'Invalid XML payload provided.' }}",
+              "type": "string"
+            },
+            {
+              "id": "timestamp-error",
+              "name": "timestamp",
+              "value": "={{ $now.toISO() }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "name": "Format Error Payload",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        -800,
+        1168
+      ],
+      "typeVersion": 3.4,
+      "id": "d1a2b3c4-5e6f-7a8b-9c0d-1e2f3a4b5c6d"
+    },
+    {
+      "parameters": {
+        "sendTo": "abdulwasayrao917@gmail.com",
+        "subject": "Alert: Invalid XML Submitted to Hub",
+        "emailType": "text",
+        "message": "={{ 'An invalid XML payload was submitted to the XML Transformation Hub. Error details: ' + $json.message }}",
+        "options": {}
+      },
+      "name": "Gmail Alert",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        -576,
+        1080
+      ],
+      "id": "e97ce05a-e033-4701-81e2-6b6ca74fc10d",
+      "webhookId": "de9afc27-a467-47e3-8ff6-2f289d45d086",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "Sa0TvK34qq1ZFXSl",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($json) }}",
+        "options": {
+          "responseCode": 400,
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Access-Control-Allow-Origin",
+                "value": "*"
+              },
+              {
+                "name": "Content-Type",
+                "value": "application/json"
+              }
+            ]
+          }
+        }
+      },
+      "name": "Respond Webhook (Error)",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        -576,
+        1268
+      ],
+      "id": "e5f6a7b8-9c0d-1e2f-3a4b-5c6d7e8f9a0b"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook Trigger": {
+      "main": [
+        [
+          {
+            "node": "Extract & Validate XML Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract & Validate XML Input": {
+      "main": [
+        [
+          {
+            "node": "If Valid XML",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If Valid XML": {
+      "main": [
+        [
+          {
+            "node": "XML to JSON Parser",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Format Error Payload",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "XML to JSON Parser": {
+      "main": [
+        [
+          {
+            "node": "Format JSON Success Payload",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format JSON Success Payload": {
+      "main": [
+        [
+          {
+            "node": "Respond Webhook (Success)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Error Payload": {
+      "main": [
+        [
+          {
+            "node": "Gmail Alert",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Respond Webhook (Error)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "3d953626-7b4d-46fa-9d98-c4b5cdd19193",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "57e38e0823d9650c72738d7ec9970330dda35dd35e696a01928746b0b19668c4"
+  },
+  "nodeGroups": [],
+  "id": "HzSlFJpLOLzoLZVW",
+  "tags": []
+}

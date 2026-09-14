@@ -1,0 +1,668 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>XML Data Transformation Hub | n8n Webhook Interface</title>
+  <!-- Google Fonts: Inter & JetBrains Mono -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  
+  <style>
+    :root {
+      --bg-main: #090d16;
+      --bg-card: rgba(17, 24, 39, 0.7);
+      --bg-card-border: rgba(255, 255, 255, 0.08);
+      --bg-input: rgba(15, 23, 42, 0.8);
+      --primary: #6366f1;
+      --primary-hover: #4f46e5;
+      --primary-glow: rgba(99, 102, 241, 0.35);
+      --accent-emerald: #10b981;
+      --accent-rose: #f43f5e;
+      --accent-amber: #f59e0b;
+      --accent-cyan: #06b6d4;
+      --text-main: #f3f4f6;
+      --text-muted: #9ca3af;
+      --text-dim: #6b7280;
+      --border-radius: 14px;
+      --transition-fast: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Inter', system-ui, -apple-system, sans-serif;
+      background-color: var(--bg-main);
+      background-image: 
+        radial-gradient(at 15% 15%, rgba(99, 102, 241, 0.15) 0px, transparent 40%),
+        radial-gradient(at 85% 85%, rgba(16, 185, 129, 0.12) 0px, transparent 40%);
+      background-attachment: fixed;
+      color: var(--text-main);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 2rem 1rem;
+    }
+
+    .container {
+      width: 100%;
+      max-width: 1100px;
+      margin: 0 auto;
+    }
+
+    /* Header */
+    .header {
+      text-align: center;
+      margin-bottom: 2.5rem;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.35rem 0.85rem;
+      border-radius: 9999px;
+      background: rgba(99, 102, 241, 0.12);
+      border: 1px solid rgba(99, 102, 241, 0.3);
+      color: #a5b4fc;
+      font-size: 0.825rem;
+      font-weight: 500;
+      margin-bottom: 1rem;
+    }
+
+    .badge-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background-color: var(--accent-emerald);
+      box-shadow: 0 0 8px var(--accent-emerald);
+    }
+
+    .header h1 {
+      font-size: 2.5rem;
+      font-weight: 700;
+      letter-spacing: -0.025em;
+      background: linear-gradient(135deg, #ffffff 0%, #cbd5e1 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      margin-bottom: 0.75rem;
+    }
+
+    .header p {
+      color: var(--text-muted);
+      font-size: 1.05rem;
+      max-width: 600px;
+      margin: 0 auto;
+      line-height: 1.6;
+    }
+
+    /* Webhook Config Bar */
+    .config-card {
+      background: var(--bg-card);
+      backdrop-filter: blur(12px);
+      border: 1px solid var(--bg-card-border);
+      border-radius: var(--border-radius);
+      padding: 1.25rem;
+      margin-bottom: 1.5rem;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 1rem;
+      align-items: center;
+      box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.5);
+    }
+
+    .input-group {
+      display: flex;
+      flex-direction: column;
+      gap: 0.4rem;
+      flex: 1;
+      min-width: 280px;
+    }
+
+    .input-group label {
+      font-size: 0.825rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--text-muted);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .input-control {
+      width: 100%;
+      background: var(--bg-input);
+      border: 1px solid var(--bg-card-border);
+      border-radius: 8px;
+      padding: 0.75rem 1rem;
+      color: var(--text-main);
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.9rem;
+      transition: var(--transition-fast);
+      outline: none;
+    }
+
+    .input-control:focus {
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px var(--primary-glow);
+    }
+
+    /* Main Grid */
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 1.5rem;
+    }
+
+    @media (min-width: 900px) {
+      .grid {
+        grid-template-columns: 1fr 1fr;
+      }
+    }
+
+    /* Editor & Output Cards */
+    .card {
+      background: var(--bg-card);
+      backdrop-filter: blur(12px);
+      border: 1px solid var(--bg-card-border);
+      border-radius: var(--border-radius);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      box-shadow: 0 15px 35px -15px rgba(0, 0, 0, 0.6);
+      height: 580px;
+    }
+
+    .card-header {
+      padding: 1rem 1.25rem;
+      background: rgba(255, 255, 255, 0.02);
+      border-bottom: 1px solid var(--bg-card-border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .card-title {
+      font-size: 0.95rem;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      color: var(--text-main);
+    }
+
+    .card-actions {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .btn-secondary {
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid var(--bg-card-border);
+      color: var(--text-muted);
+      padding: 0.4rem 0.75rem;
+      border-radius: 6px;
+      font-size: 0.8rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: var(--transition-fast);
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+    }
+
+    .btn-secondary:hover {
+      background: rgba(255, 255, 255, 0.1);
+      color: var(--text-main);
+      border-color: rgba(255, 255, 255, 0.2);
+    }
+
+    .btn-copy.copied {
+      background: rgba(16, 185, 129, 0.18) !important;
+      border-color: rgba(16, 185, 129, 0.4) !important;
+      color: var(--accent-emerald) !important;
+    }
+
+    .card-body {
+      flex: 1;
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    textarea.xml-editor {
+      width: 100%;
+      height: 100%;
+      background: transparent;
+      border: none;
+      padding: 1.25rem;
+      color: #e2e8f0;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.875rem;
+      line-height: 1.6;
+      resize: none;
+      outline: none;
+      tab-size: 2;
+    }
+
+    .card-footer {
+      padding: 1rem 1.25rem;
+      border-top: 1px solid var(--bg-card-border);
+      background: rgba(0, 0, 0, 0.2);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, var(--primary) 0%, var(--primary-hover) 100%);
+      color: white;
+      border: none;
+      padding: 0.65rem 1.4rem;
+      border-radius: 8px;
+      font-size: 0.9rem;
+      font-weight: 600;
+      cursor: pointer;
+      box-shadow: 0 4px 14px var(--primary-glow);
+      transition: var(--transition-fast);
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .btn-primary:hover:not(:disabled) {
+      transform: translateY(-1px);
+      box-shadow: 0 6px 20px var(--primary-glow);
+    }
+
+    .btn-primary:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    /* Output View */
+    .output-container {
+      width: 100%;
+      height: 100%;
+      overflow: auto;
+      padding: 1.25rem;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.85rem;
+      line-height: 1.6;
+    }
+
+    pre.json-code {
+      white-space: pre-wrap;
+      word-break: break-word;
+      color: #e2e8f0;
+    }
+
+    /* Syntax Highlighting */
+    .json-key { color: #818cf8; font-weight: 500; }
+    .json-string { color: #34d399; }
+    .json-number { color: #f6ad55; }
+    .json-boolean { color: #f472b6; font-weight: 600; }
+    .json-null { color: #94a3b8; font-style: italic; }
+
+    /* Empty state */
+    .placeholder-state {
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      color: var(--text-dim);
+      text-align: center;
+      padding: 2rem;
+    }
+
+    /* Error Alert Box */
+    .error-card {
+      background: rgba(244, 63, 94, 0.08);
+      border: 1px solid rgba(244, 63, 94, 0.25);
+      border-radius: 8px;
+      padding: 1rem;
+      color: #fca5a5;
+      margin: 1.25rem;
+    }
+
+    .error-card h4 {
+      font-size: 0.9rem;
+      font-weight: 600;
+      margin-bottom: 0.35rem;
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+    }
+
+    /* Status Pill */
+    .status-pill {
+      font-size: 0.75rem;
+      font-weight: 600;
+      padding: 0.2rem 0.5rem;
+      border-radius: 4px;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.3rem;
+    }
+
+    .status-pill.success {
+      background: rgba(16, 185, 129, 0.15);
+      color: var(--accent-emerald);
+      border: 1px solid rgba(16, 185, 129, 0.3);
+    }
+
+    .status-pill.error {
+      background: rgba(244, 63, 94, 0.15);
+      color: var(--accent-rose);
+      border: 1px solid rgba(244, 63, 94, 0.3);
+    }
+
+    /* Footer */
+    .footer {
+      margin-top: 3rem;
+      text-align: center;
+      color: var(--text-dim);
+      font-size: 0.825rem;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+    <!-- Header -->
+    <header class="header">
+      <div class="badge">
+        <span class="badge-dot"></span>
+        n8n Webhook Engine
+      </div>
+      <h1>XML Data Transformation Hub</h1>
+      <p>Convert raw XML payloads into structured JSON instantly with background n8n webhook validation.</p>
+    </header>
+
+    <!-- Webhook Configuration -->
+    <div class="config-card">
+      <div class="input-group">
+        <label for="webhookUrl">
+          n8n Webhook Endpoint URL
+          <span style="font-weight: normal; color: var(--text-dim); text-transform: none;">(POST Target)</span>
+        </label>
+        <input 
+          type="url" 
+          id="webhookUrl" 
+          class="input-control" 
+          placeholder="http://localhost:5678/webhook/ab8a227d-7f23-4520-b64d-8d9a2c2bea31" 
+          value="http://localhost:5678/webhook/ab8a227d-7f23-4520-b64d-8d9a2c2bea31"
+        />
+      </div>
+    </div>
+
+    <!-- Main Grid -->
+    <div class="grid">
+      <!-- Input Panel -->
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--primary);">
+              <polyline points="16 18 22 12 16 6"></polyline>
+              <polyline points="8 6 2 12 8 18"></polyline>
+            </svg>
+            Raw XML Input
+          </div>
+          <div class="card-actions">
+            <button type="button" class="btn-secondary" id="btnSample">Sample XML</button>
+            <button type="button" class="btn-secondary" id="btnClear">Clear</button>
+          </div>
+        </div>
+
+        <div class="card-body">
+          <textarea 
+            id="xmlInput" 
+            class="xml-editor" 
+            placeholder="Paste or type your raw XML snippet here..."
+            spellcheck="false"
+          ></textarea>
+        </div>
+
+        <div class="card-footer">
+          <span id="charCount" style="font-size: 0.8rem; color: var(--text-dim);">0 characters</span>
+          <button type="button" id="btnSubmit" class="btn-primary">
+            <span id="submitText">Transform XML</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Output Panel -->
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--accent-emerald);">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+              <polyline points="14 2 14 8 20 8"></polyline>
+            </svg>
+            Parsed JSON Result
+            <span id="statusMeta"></span>
+          </div>
+          <div class="card-actions">
+            <button type="button" class="btn-secondary btn-copy" id="btnCopy" style="display: none;">
+              <svg id="copyIcon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+              </svg>
+              <span id="copyText">Copy JSON</span>
+            </button>
+          </div>
+        </div>
+
+        <div class="card-body" id="outputBody">
+          <!-- Placeholder State -->
+          <div class="placeholder-state" id="placeholderState">
+            <p>Your transformed JSON output will appear here after submission.</p>
+          </div>
+
+          <!-- Dynamic Output View -->
+          <div class="output-container" id="outputContainer" style="display: none;">
+            <pre class="json-code" id="jsonDisplay"></pre>
+          </div>
+        </div>
+
+        <div class="card-footer" style="justify-content: flex-end;">
+          <span id="latencyTag" style="font-size: 0.8rem; color: var(--text-dim);">Idle</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="footer">
+      <p>XML Data Transformation Hub &bull; Powered by n8n Webhooks</p>
+    </footer>
+  </div>
+
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      const xmlInput = document.getElementById('xmlInput');
+      const webhookUrlInput = document.getElementById('webhookUrl');
+      const btnSubmit = document.getElementById('btnSubmit');
+      const submitText = document.getElementById('submitText');
+      const btnSample = document.getElementById('btnSample');
+      const btnClear = document.getElementById('btnClear');
+      const btnCopy = document.getElementById('btnCopy');
+      const copyText = document.getElementById('copyText');
+      const copyIcon = document.getElementById('copyIcon');
+      const charCount = document.getElementById('charCount');
+      const placeholderState = document.getElementById('placeholderState');
+      const outputContainer = document.getElementById('outputContainer');
+      const jsonDisplay = document.getElementById('jsonDisplay');
+      const statusMeta = document.getElementById('statusMeta');
+      const latencyTag = document.getElementById('latencyTag');
+
+      let rawJsonResponseText = '';
+
+      const sampleXML = `<?xml version="1.0" encoding="UTF-8"?>
+<order id="ORD-9842" status="processing" currency="USD">
+  <customer>
+    <id>CUST-10492</id>
+    <name>Sarah Jenkins</name>
+    <email>sarah.jenkins@example.com</email>
+  </customer>
+  <items>
+    <item sku="TECH-001">
+      <description>Wireless Noise-Canceling Headphones</description>
+      <quantity>1</quantity>
+      <unitPrice>299.99</unitPrice>
+    </item>
+  </items>
+  <summary>
+    <subtotal>299.99</subtotal>
+    <tax>24.00</tax>
+    <total>323.99</total>
+  </summary>
+</order>`;
+
+      const defaultCopyIconSvg = `<rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>`;
+      const copiedIconSvg = `<polyline points="20 6 9 17 4 12"></polyline>`;
+
+      xmlInput.addEventListener('input', () => {
+        charCount.textContent = `${xmlInput.value.length.toLocaleString()} characters`;
+      });
+
+      btnSample.addEventListener('click', () => {
+        xmlInput.value = sampleXML;
+        xmlInput.dispatchEvent(new Event('input'));
+      });
+
+      btnClear.addEventListener('click', () => {
+        xmlInput.value = '';
+        xmlInput.dispatchEvent(new Event('input'));
+        resetOutputState();
+      });
+
+      // Copy JSON button listener
+      btnCopy.addEventListener('click', async () => {
+        const textToCopy = rawJsonResponseText || jsonDisplay.textContent;
+        if (!textToCopy) return;
+
+        try {
+          await navigator.clipboard.writeText(textToCopy);
+          
+          // Visual Feedback
+          btnCopy.classList.add('copied');
+          copyText.textContent = 'Copied!';
+          copyIcon.innerHTML = copiedIconSvg;
+
+          setTimeout(() => {
+            btnCopy.classList.remove('copied');
+            copyText.textContent = 'Copy JSON';
+            copyIcon.innerHTML = defaultCopyIconSvg;
+          }, 2000);
+        } catch (err) {
+          console.error('Copy to clipboard failed: ', err);
+        }
+      });
+
+      function resetOutputState() {
+        placeholderState.style.display = 'flex';
+        outputContainer.style.display = 'none';
+        btnCopy.style.display = 'none';
+        statusMeta.innerHTML = '';
+        latencyTag.textContent = 'Idle';
+        rawJsonResponseText = '';
+      }
+
+      function syntaxHighlight(jsonObj) {
+        let jsonStr = typeof jsonObj === 'string' ? jsonObj : JSON.stringify(jsonObj, null, 2);
+        rawJsonResponseText = jsonStr;
+        
+        let escaped = jsonStr.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        return escaped.replace(/("(\\u[a-zA-Z0-9]{4}|\\[^u]|[^\\"])*"(\s*:)?|\b(true|false|null)\b|-?\d+(?:\.\d*)?(?:[eE][+\-]?\d+)?)/g, (match) => {
+          let cls = 'json-number';
+          if (/^"/.test(match)) cls = /:$/.test(match) ? 'json-key' : 'json-string';
+          else if (/true|false/.test(match)) cls = 'json-boolean';
+          else if (/null/.test(match)) cls = 'json-null';
+          return `<span class="${cls}">${match}</span>`;
+        });
+      }
+
+      function renderError(message, title = 'Transformation Error') {
+        placeholderState.style.display = 'none';
+        outputContainer.style.display = 'block';
+        btnCopy.style.display = 'none';
+        rawJsonResponseText = '';
+
+        outputContainer.innerHTML = `
+          <div class="error-card">
+            <h4>${title}</h4>
+            <p style="margin-top: 0.5rem; font-size: 0.85rem;">${message}</p>
+          </div>`;
+        statusMeta.innerHTML = `<span class="status-pill error">Failed</span>`;
+      }
+
+      btnSubmit.addEventListener('click', async () => {
+        const rawXml = xmlInput.value.trim();
+        const webhookUrl = webhookUrlInput.value.trim();
+
+        if (!rawXml) {
+          renderError('Please paste raw XML data into the editor before submitting.', 'Validation Error');
+          return;
+        }
+
+        if (!webhookUrl) {
+          renderError('Please enter a valid n8n Webhook URL.', 'Configuration Error');
+          return;
+        }
+
+        btnSubmit.disabled = true;
+        submitText.textContent = 'Processing...';
+        const startTime = performance.now();
+        latencyTag.textContent = 'Sending...';
+
+        try {
+          const response = await fetch(webhookUrl, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Accept': 'application/json'
+            },
+            body: JSON.stringify({ xml: rawXml })
+          });
+
+          const duration = Math.round(performance.now() - startTime);
+          latencyTag.textContent = `${duration} ms`;
+
+          const data = await response.json();
+
+          if (response.ok && !data.error) {
+            placeholderState.style.display = 'none';
+            outputContainer.style.display = 'block';
+            outputContainer.innerHTML = '<pre class="json-code" id="jsonDisplay"></pre>';
+            document.getElementById('jsonDisplay').innerHTML = syntaxHighlight(data);
+            
+            // Show Copy JSON button only on successful output render
+            btnCopy.style.display = 'inline-flex';
+            statusMeta.innerHTML = `<span class="status-pill success">${response.status} OK</span>`;
+          } else {
+            renderError(data.message || 'Workflow returned error.', `Server Error (${response.status})`);
+          }
+        } catch (err) {
+          const duration = Math.round(performance.now() - startTime);
+          latencyTag.textContent = `${duration} ms`;
+          renderError(`Network error: ${err.message}. Check CORS settings or Webhook availability.`, 'Connection Failed');
+        } finally {
+          btnSubmit.disabled = false;
+          submitText.textContent = 'Transform XML';
+        }
+      });
+    });
+  </script>
+</body>
+</html>
