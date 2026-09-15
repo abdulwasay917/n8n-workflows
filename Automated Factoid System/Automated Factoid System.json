@@ -1,0 +1,983 @@
+{
+  "name": "Automated Factoid System",
+  "nodes": [
+    {
+      "parameters": {
+        "path": "009978a1-4f0f-4594-8cb9-ad0219872ee6",
+        "formTitle": "Free Factoids Subscription",
+        "formDescription": "Subscribe to receive automated factoids on your favorite topics direct to your inbox!",
+        "formFields": {
+          "values": [
+            {
+              "fieldLabel": "Topic",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Email Address",
+              "fieldType": "email",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Frequency",
+              "fieldType": "dropdown",
+              "fieldOptions": {
+                "values": [
+                  {
+                    "option": "Daily"
+                  },
+                  {
+                    "option": "Weekly"
+                  },
+                  {
+                    "option": "Monthly"
+                  },
+                  {
+                    "option": "Surprise"
+                  }
+                ]
+              },
+              "requiredField": true
+            }
+          ]
+        },
+        "options": {}
+      },
+      "name": "n8n Form Trigger",
+      "type": "n8n-nodes-base.formTrigger",
+      "position": [
+        0,
+        0
+      ],
+      "typeVersion": 1,
+      "id": "3c0cb0cd-1243-4a87-ba4c-a57735dc1f54",
+      "webhookId": "009978a1-4f0f-4594-8cb9-ad0219872ee6"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "field-email",
+              "name": "email",
+              "value": "={{ $json['Email Address'].trim().toLowerCase() }}",
+              "type": "string"
+            },
+            {
+              "id": "field-topic",
+              "name": "topic",
+              "value": "={{ $json['Topic'].trim() }}",
+              "type": "string"
+            },
+            {
+              "id": "field-frequency",
+              "name": "frequency",
+              "value": "={{ $json['Frequency'] }}",
+              "type": "string"
+            },
+            {
+              "id": "field-status",
+              "name": "status",
+              "value": "active",
+              "type": "string"
+            },
+            {
+              "id": "field-subscribed-at",
+              "name": "subscribedAt",
+              "value": "={{ $now.toISO() }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "name": "Format Subscriber Data",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        240,
+        0
+      ],
+      "typeVersion": 3.4,
+      "id": "e8c71be7-6130-4779-ae9f-4ca371f84dc4"
+    },
+    {
+      "parameters": {
+        "operation": "appendOrUpdate",
+        "documentId": {
+          "__rl": true,
+          "value": "1zSKtXsOMlroAzmI7v5k54Le87qo6-pcyjVy-BFJgTEg",
+          "mode": "list",
+          "cachedResultName": "Automated Factroid System",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1zSKtXsOMlroAzmI7v5k54Le87qo6-pcyjVy-BFJgTEg/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Sheet1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1zSKtXsOMlroAzmI7v5k54Le87qo6-pcyjVy-BFJgTEg/edit#gid=0"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "email": "={{ $json.email }}",
+            "topic": "={{ $json.topic }}",
+            "frequency": "={{ $json.frequency }}",
+            "status": "={{ $json.status }}"
+          },
+          "matchingColumns": [
+            "email"
+          ],
+          "schema": [
+            {
+              "id": "email",
+              "displayName": "email",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "topic",
+              "displayName": "topic",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "frequency",
+              "displayName": "frequency",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "status",
+              "displayName": "status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": false,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "name": "Google Sheets Upsert Subscriber",
+      "type": "n8n-nodes-base.googleSheets",
+      "position": [
+        480,
+        0
+      ],
+      "typeVersion": 4.5,
+      "id": "bc9d4e29-b754-4ff6-99a5-d031a25f832a",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "8PEpvxG8GR5psl2S",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $('Format Subscriber Data').item.json.email }}",
+        "subject": "={{ 'Subscription Confirmed: Free Factoids on ' + $('Format Subscriber Data').item.json.topic }}",
+        "emailType": "text",
+        "message": "={{ 'Hello!\\n\\nThank you for subscribing to the Free Factoids System.\\n\\nYou will now receive regular factoids on your selected topic: ' + $('Format Subscriber Data').item.json.topic + ' (' + $('Format Subscriber Data').item.json.frequency + ').\\n\\nWelcome aboard!' }}",
+        "options": {}
+      },
+      "name": "Send Confirmation Email",
+      "type": "n8n-nodes-base.gmail",
+      "position": [
+        720,
+        0
+      ],
+      "typeVersion": 2.1,
+      "id": "f7a8b9c0-d1e2-4f3a-5b6c-7d8e9f0a1b2c",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "Sa0TvK34qq1ZFXSl",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "path": "free-factoids-unsubscribe",
+        "formTitle": "Unsubscribe from Free Factoids",
+        "formDescription": "We are sorry to see you go! Enter your registered email address below to cancel your subscription.",
+        "formFields": {
+          "values": [
+            {
+              "fieldLabel": "Email Address",
+              "fieldType": "email",
+              "requiredField": true
+            }
+          ]
+        },
+        "options": {
+          "respondWith": "text",
+          "responseMessage": "You have been successfully unsubscribed from the Free Factoids System."
+        }
+      },
+      "name": "Unsubscribe Form Trigger",
+      "type": "n8n-nodes-base.formTrigger",
+      "position": [
+        0,
+        240
+      ],
+      "typeVersion": 1,
+      "id": "a9b8c7d6-e5f4-3a2b-1c0d-9e8f7a6b5c4d",
+      "webhookId": "free-factoids-unsubscribe"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "unsub-email",
+              "name": "email",
+              "value": "={{ $json['Email Address'].trim().toLowerCase() }}",
+              "type": "string"
+            },
+            {
+              "id": "unsub-status",
+              "name": "status",
+              "value": "inactive",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "name": "Format Unsubscribe Data",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        240,
+        240
+      ],
+      "typeVersion": 3.4,
+      "id": "b8c7d6e5-f4a3-2b1c-0d9e-8f7a6b5c4d3e"
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "value": "1zSKtXsOMlroAzmI7v5k54Le87qo6-pcyjVy-BFJgTEg",
+          "mode": "list",
+          "cachedResultName": "Automated Factroid System",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1zSKtXsOMlroAzmI7v5k54Le87qo6-pcyjVy-BFJgTEg/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Sheet1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1zSKtXsOMlroAzmI7v5k54Le87qo6-pcyjVy-BFJgTEg/edit#gid=0"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "email": "={{ $json.email }}",
+            "status": "inactive"
+          },
+          "matchingColumns": [
+            "email"
+          ],
+          "schema": [
+            {
+              "id": "email",
+              "displayName": "email",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "status",
+              "displayName": "status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": false,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "name": "Google Sheets Mark Inactive",
+      "type": "n8n-nodes-base.googleSheets",
+      "position": [
+        480,
+        240
+      ],
+      "typeVersion": 4.5,
+      "id": "c7d6e5f4-a3b2-1c0d-9e8f-7a6b5c4d3e2f",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "8PEpvxG8GR5psl2S",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 9 * * *"
+            }
+          ]
+        }
+      },
+      "name": "Daily 9:00 AM Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "position": [
+        0,
+        480
+      ],
+      "typeVersion": 1.2,
+      "id": "d1e2f3a4-b5c6-7d8e-9f0a-1b2c3d4e5f6a"
+    },
+    {
+      "parameters": {
+        "operation": "read",
+        "documentId": {
+          "__rl": true,
+          "value": "1zSKtXsOMlroAzmI7v5k54Le87qo6-pcyjVy-BFJgTEg",
+          "mode": "list",
+          "cachedResultName": "Automated Factroid System",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1zSKtXsOMlroAzmI7v5k54Le87qo6-pcyjVy-BFJgTEg/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Sheet1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1zSKtXsOMlroAzmI7v5k54Le87qo6-pcyjVy-BFJgTEg/edit#gid=0"
+        },
+        "filtersUI": {
+          "values": [
+            {
+              "lookupColumn": "frequency",
+              "lookupValue": "Daily"
+            },
+            {
+              "lookupColumn": "status",
+              "lookupValue": "active"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "name": "Fetch Active Daily Subscribers",
+      "type": "n8n-nodes-base.googleSheets",
+      "position": [
+        240,
+        480
+      ],
+      "typeVersion": 4.5,
+      "id": "e2f3a4b5-c6d7-8e9f-0a1b-2c3d4e5f6a7b",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "8PEpvxG8GR5psl2S",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "read",
+        "documentId": {
+          "__rl": true,
+          "value": "1zSKtXsOMlroAzmI7v5k54Le87qo6-pcyjVy-BFJgTEg",
+          "mode": "list",
+          "cachedResultName": "Automated Factroid System",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1zSKtXsOMlroAzmI7v5k54Le87qo6-pcyjVy-BFJgTEg/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Sheet1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1zSKtXsOMlroAzmI7v5k54Le87qo6-pcyjVy-BFJgTEg/edit#gid=0"
+        },
+        "filtersUI": {
+          "values": [
+            {
+              "lookupColumn": "frequency",
+              "lookupValue": "Surprise"
+            },
+            {
+              "lookupColumn": "status",
+              "lookupValue": "active"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "name": "Fetch Active Surprise Subscribers",
+      "type": "n8n-nodes-base.googleSheets",
+      "position": [
+        240,
+        680
+      ],
+      "typeVersion": 4.5,
+      "id": "f3a4b5c6-d7e8-9f0a-1b2c-3d4e5f6a7b8c",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "8PEpvxG8GR5psl2S",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "let items = $input.all();\nif (items.length === 0) return [];\n\n// Random selection logic: ~35% probability per surprise subscriber\nlet selected = items.filter(() => Math.random() < 0.35);\n\n// Guarantee at least 1 surprise user is selected if list is non-empty\nif (selected.length === 0 && items.length > 0) {\n  let randomIndex = Math.floor(Math.random() * items.length);\n  selected.push(items[randomIndex]);\n}\n\nreturn selected;"
+      },
+      "name": "Random Subset Selector",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        480,
+        680
+      ],
+      "typeVersion": 1,
+      "id": "a4b5c6d7-e8f9-0a1b-2c3d-4e5f6a7b8c9d"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "child-email",
+              "name": "email",
+              "value": "={{ $json.email || $json['Email Address'] || $json.Email }}",
+              "type": "string"
+            },
+            {
+              "id": "child-topic",
+              "name": "topic",
+              "value": "={{ $json.topic || $json.Topic }}",
+              "type": "string"
+            },
+            {
+              "id": "child-frequency",
+              "name": "frequency",
+              "value": "={{ $json.frequency || $json.Frequency || 'Daily' }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "name": "Format Payload for Child Workflow",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        720,
+        580
+      ],
+      "typeVersion": 3.4,
+      "id": "b5c6d7e8-f9a0-1b2c-3d4e-5f6a7b8c9d0e"
+    },
+    {
+      "parameters": {
+        "source": "parameter",
+        "workflowId": {
+          "__rl": true,
+          "value": "child-factoid-pipeline-id",
+          "mode": "id"
+        },
+        "options": {}
+      },
+      "name": "Execute Child Factoid Pipeline",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "position": [
+        960,
+        580
+      ],
+      "typeVersion": 1.1,
+      "id": "c6d7e8f9-a0b1-2c3d-4e5f-6a7b8c9d0e1f"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "name": "Execute Workflow Trigger",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "position": [
+        0,
+        920
+      ],
+      "typeVersion": 1,
+      "id": "d7e8f9a0-b1c2-3d4e-5f6a-7b8c9d0e1f2a"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "='Research and synthesize a unique, fascinating 2-3 sentence factoid on the topic: ' + $json.topic",
+        "options": {
+          "systemMessage": "You are an expert factoid researcher. Use the Wikipedia tool to search for real, verified information about the given topic. Synthesize the findings into an engaging, accurate, and educational factoid (2-3 sentences)."
+        }
+      },
+      "name": "AI Factoid Generator Agent",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "position": [
+        240,
+        920
+      ],
+      "typeVersion": 1.7,
+      "id": "e8f9a0b1-c2d3-4e5f-6a7b-8c9d0e1f2a3b"
+    },
+    {
+      "parameters": {
+        "model": "llama-3.3-70b-versatile",
+        "options": {}
+      },
+      "name": "Groq Chat Model (llama-3.3-70b-versatile)",
+      "type": "@n8n/n8n-nodes-langchain.lmChatGroq",
+      "position": [
+        240,
+        1120
+      ],
+      "typeVersion": 1,
+      "id": "f9a0b1c2-d3e4-5f6a-7b8c-9d0e1f2a3b4c",
+      "credentials": {
+        "groqApi": {
+          "id": "groq-api-creds",
+          "name": "Groq account"
+        }
+      }
+    },
+    {
+      "parameters": {},
+      "name": "Wikipedia Research Tool",
+      "type": "@n8n/n8n-nodes-langchain.toolWikipedia",
+      "position": [
+        380,
+        1120
+      ],
+      "typeVersion": 1,
+      "id": "a0b1c2d3-e4f5-6a7b-8c9d-0e1f2a3b4c5d"
+    },
+    {
+      "parameters": {
+        "resource": "image",
+        "operation": "generate",
+        "prompt": "='Create a vivid, modern vector illustration or digital artwork representing this factoid: ' + $json.output",
+        "options": {
+          "size": "1024x1024"
+        }
+      },
+      "name": "Generate Factoid Illustration (DALL-E)",
+      "type": "n8n-nodes-base.openAi",
+      "position": [
+        480,
+        920
+      ],
+      "typeVersion": 1,
+      "id": "b1c2d3e4-f5a6-7b8c-9d0e-1f2a3b4c5d6e",
+      "credentials": {
+        "openAiApi": {
+          "id": "openai-api-creds",
+          "name": "OpenAI account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "resize",
+        "width": 480,
+        "height": 360,
+        "options": {
+          "resizeOption": "custom"
+        }
+      },
+      "name": "Resize Illustration (480x360)",
+      "type": "n8n-nodes-base.editImage",
+      "position": [
+        720,
+        920
+      ],
+      "typeVersion": 1,
+      "id": "c2d3e4f5-a6b7-8c9d-0e1f-2a3b4c5d6e7f"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "delivery-email",
+              "name": "recipientEmail",
+              "value": "={{ $('Execute Workflow Trigger').item.json.email }}",
+              "type": "string"
+            },
+            {
+              "id": "delivery-subject",
+              "name": "subject",
+              "value": "=\"Your Daily Factoid: \" + $('Execute Workflow Trigger').item.json.topic",
+              "type": "string"
+            },
+            {
+              "id": "delivery-factoid",
+              "name": "factoidText",
+              "value": "={{ $('AI Factoid Generator Agent').item.json.output }}",
+              "type": "string"
+            },
+            {
+              "id": "delivery-topic",
+              "name": "topic",
+              "value": "={{ $('Execute Workflow Trigger').item.json.topic }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "name": "Format Delivery Payload",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        960,
+        920
+      ],
+      "typeVersion": 3.4,
+      "id": "d3e4f5a6-b7c8-9d0e-1f2a-3b4c5d6e7f8a"
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $json.recipientEmail }}",
+        "subject": "={{ $json.subject }}",
+        "emailType": "html",
+        "message": "=\"<div style='font-family:sans-serif;max-width:600px;margin:auto;padding:20px;border:1px solid #e2e8f0;border-radius:12px;'><h2 style='color:#6366f1;'>Your Daily Factoid</h2><p style='font-size:16px;line-height:1.6;color:#334155;'>\" + $json.factoidText + \"</p><p style='font-size:14px;color:#64748b;'><strong>Topic:</strong> \" + $json.topic + \"</p><hr style='border:none;border-top:1px solid #e2e8f0;margin:20px 0;'><p style='font-size:12px;color:#94a3b8;'>You received this email because you subscribed to the Automated Factoid System.</p></div>\"",
+        "options": {
+          "attachmentsUi": {
+            "values": [
+              {
+                "binaryPropertyName": "data"
+              }
+            ]
+          }
+        }
+      },
+      "name": "Send Factoid Email to Subscriber",
+      "type": "n8n-nodes-base.gmail",
+      "position": [
+        1200,
+        920
+      ],
+      "typeVersion": 2.1,
+      "id": "e4f5a6b7-c8d9-0e1f-2a3b-4c5d6e7f8a9b",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "Sa0TvK34qq1ZFXSl",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "value": "1zSKtXsOMlroAzmI7v5k54Le87qo6-pcyjVy-BFJgTEg",
+          "mode": "list",
+          "cachedResultName": "Automated Factroid System",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1zSKtXsOMlroAzmI7v5k54Le87qo6-pcyjVy-BFJgTEg/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Sheet1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1zSKtXsOMlroAzmI7v5k54Le87qo6-pcyjVy-BFJgTEg/edit#gid=0"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "email": "={{ $('Format Delivery Payload').item.json.recipientEmail }}",
+            "Last Sent": "={{ $now.toISO() }}"
+          },
+          "matchingColumns": [
+            "email"
+          ],
+          "schema": [
+            {
+              "id": "email",
+              "displayName": "email",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Last Sent",
+              "displayName": "Last Sent",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": false,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "name": "Log Last Sent Audit Timestamp",
+      "type": "n8n-nodes-base.googleSheets",
+      "position": [
+        1440,
+        920
+      ],
+      "typeVersion": 4.5,
+      "id": "f5a6b7c8-d9e0-1f2a-3b4c-5d6e7f8a9b0c",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "8PEpvxG8GR5psl2S",
+          "name": "Google Sheets account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "n8n Form Trigger": {
+      "main": [
+        [
+          {
+            "node": "Format Subscriber Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Subscriber Data": {
+      "main": [
+        [
+          {
+            "node": "Google Sheets Upsert Subscriber",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Sheets Upsert Subscriber": {
+      "main": [
+        [
+          {
+            "node": "Send Confirmation Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Unsubscribe Form Trigger": {
+      "main": [
+        [
+          {
+            "node": "Format Unsubscribe Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Unsubscribe Data": {
+      "main": [
+        [
+          {
+            "node": "Google Sheets Mark Inactive",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Daily 9:00 AM Trigger": {
+      "main": [
+        [
+          {
+            "node": "Fetch Active Daily Subscribers",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Fetch Active Surprise Subscribers",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Active Daily Subscribers": {
+      "main": [
+        [
+          {
+            "node": "Format Payload for Child Workflow",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Active Surprise Subscribers": {
+      "main": [
+        [
+          {
+            "node": "Random Subset Selector",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Random Subset Selector": {
+      "main": [
+        [
+          {
+            "node": "Format Payload for Child Workflow",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Payload for Child Workflow": {
+      "main": [
+        [
+          {
+            "node": "Execute Child Factoid Pipeline",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Execute Workflow Trigger": {
+      "main": [
+        [
+          {
+            "node": "AI Factoid Generator Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Groq Chat Model (llama-3.3-70b-versatile)": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Factoid Generator Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wikipedia Research Tool": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Factoid Generator Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Factoid Generator Agent": {
+      "main": [
+        [
+          {
+            "node": "Generate Factoid Illustration (DALL-E)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate Factoid Illustration (DALL-E)": {
+      "main": [
+        [
+          {
+            "node": "Resize Illustration (480x360)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Resize Illustration (480x360)": {
+      "main": [
+        [
+          {
+            "node": "Format Delivery Payload",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Delivery Payload": {
+      "main": [
+        [
+          {
+            "node": "Send Factoid Email to Subscriber",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Factoid Email to Subscriber": {
+      "main": [
+        [
+          {
+            "node": "Log Last Sent Audit Timestamp",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "700dce23-d1b7-4fad-a393-0a9f84e03e8a",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "57e38e0823d9650c72738d7ec9970330dda35dd35e696a01928746b0b19668c4"
+  },
+  "nodeGroups": [],
+  "id": "04NU7iiaIakRjs4F",
+  "tags": []
+}
